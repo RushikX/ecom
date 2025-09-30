@@ -1,17 +1,15 @@
 package main
 
 import (
-	"context"
 	"log"
+	"net/http"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofiber/adaptor/v2"
 
 	"ecom-backend/internal/config"
 	"ecom-backend/internal/database"
@@ -120,14 +118,9 @@ func init() {
 }
 
 // Handler is the main entry point for Vercel
-func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	// Convert Lambda request to Fiber request
-	return adaptor.FiberApp(app)(ctx, req)
-}
-
-func main() {
-	// Start the Lambda handler
-	lambda.Start(Handler)
+func Handler(w http.ResponseWriter, r *http.Request) {
+	// Convert HTTP request to Fiber request
+	adaptor.FiberApp(app)(w, r)
 }
 
 func seedDemoUsers(jwtSecret string) {

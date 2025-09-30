@@ -21,6 +21,18 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Global variables
+var (
+	app            *fiber.App
+	mongoClient    *mongo.Client
+	database       *mongo.Database
+	userCollection *mongo.Collection
+	productCollection *mongo.Collection
+	cartCollection *mongo.Collection
+	orderCollection *mongo.Collection
+	cfg            *Config
+)
+
 // Configuration
 type Config struct {
 	Port        string
@@ -101,24 +113,9 @@ type UpdateCartItemRequest struct {
 	Quantity int `json:"quantity"`
 }
 
-// Global variables
-var (
-	app            *fiber.App
-	mongoClient    *mongo.Client
-	database       *mongo.Database
-	userCollection *mongo.Collection
-	productCollection *mongo.Collection
-	cartCollection *mongo.Collection
-	orderCollection *mongo.Collection
-	cfg            *Config
-)
-
 func init() {
 	// Load configuration
 	cfg = loadConfig()
-
-	// Connect to MongoDB
-	connectMongoDB()
 
 	// Create Fiber app
 	app = fiber.New(fiber.Config{
@@ -134,7 +131,8 @@ func init() {
 	// Middleware
 	app.Use(recover.New())
 	app.Use(logger.New())
-	// Configure CORS based on environment
+	
+	// Configure CORS
 	var allowedOrigins string
 	if cfg.FrontendURL != "" {
 		allowedOrigins = cfg.FrontendURL + ",http://localhost:5173,http://localhost:5174"
@@ -149,14 +147,14 @@ func init() {
 		AllowCredentials: cfg.FrontendURL != "",
 	}))
 
+	// Connect to MongoDB
+	connectMongoDB()
+
 	// Initialize collections
 	userCollection = database.Collection("users")
 	productCollection = database.Collection("products")
 	cartCollection = database.Collection("carts")
 	orderCollection = database.Collection("orders")
-
-	// Seed demo data
-	seedDemoData()
 
 	// Setup routes
 	setupRoutes()
@@ -188,7 +186,8 @@ func connectMongoDB() {
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
-		log.Fatal("Failed to connect to MongoDB:", err)
+		log.Printf("Failed to connect to MongoDB: %v", err)
+		return
 	}
 
 	mongoClient = client
@@ -205,6 +204,7 @@ func setupRoutes() {
 	app.Get("/api/debug", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"message": "Debug endpoint working",
+			"mongoConnected": mongoClient != nil,
 		})
 	})
 
@@ -269,6 +269,10 @@ func loginHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	if userCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	var user User
 	err := userCollection.FindOne(context.Background(), bson.M{"email": req.Email}).Decode(&user)
 	if err != nil {
@@ -308,6 +312,10 @@ func signupHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	if userCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	// Check if user already exists
 	var existingUser User
 	err := userCollection.FindOne(context.Background(), bson.M{"email": req.Email}).Decode(&existingUser)
@@ -345,6 +353,10 @@ func getProfileHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
 	}
 
+	if userCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	var user User
 	err = userCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&user)
 	if err != nil {
@@ -370,6 +382,10 @@ func updateProfileHandler(c *fiber.Ctx) error {
 	updateData["updatedAt"] = time.Now()
 	delete(updateData, "password") // Don't allow password updates through this endpoint
 
+	if userCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	_, err = userCollection.UpdateOne(context.Background(), bson.M{"_id": objectID}, bson.M{"$set": updateData})
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update profile"})
@@ -379,6 +395,10 @@ func updateProfileHandler(c *fiber.Ctx) error {
 }
 
 func getProductsHandler(c *fiber.Ctx) error {
+	if productCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	ctx := context.Background()
 	cursor, err := productCollection.Find(ctx, bson.M{})
 	if err != nil {
@@ -401,6 +421,10 @@ func getProductHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid product ID"})
 	}
 
+	if productCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	var product Product
 	err = productCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&product)
 	if err != nil {
@@ -415,6 +439,10 @@ func getCartHandler(c *fiber.Ctx) error {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
+
+	if cartCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
 	}
 
 	var cart Cart
@@ -468,6 +496,10 @@ func addToCartHandler(c *fiber.Ctx) error {
 	var req AddToCartRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if cartCollection == nil || productCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
 	}
 
 	// Check if product exists
@@ -545,6 +577,10 @@ func updateCartItemHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	if cartCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	// Get cart
 	var cart Cart
 	err = cartCollection.FindOne(context.Background(), bson.M{"userId": objectID}).Decode(&cart)
@@ -589,6 +625,10 @@ func removeFromCartHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid product ID"})
 	}
 
+	if cartCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	// Get cart
 	var cart Cart
 	err = cartCollection.FindOne(context.Background(), bson.M{"userId": objectID}).Decode(&cart)
@@ -621,6 +661,10 @@ func clearCartHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
 	}
 
+	if cartCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	_, err = cartCollection.DeleteOne(context.Background(), bson.M{"userId": objectID})
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to clear cart"})
@@ -643,6 +687,10 @@ func createOrderHandler(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if orderCollection == nil || productCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
 	}
 
 	// Calculate total
@@ -673,7 +721,9 @@ func createOrderHandler(c *fiber.Ctx) error {
 	}
 
 	// Clear cart
-	cartCollection.DeleteOne(context.Background(), bson.M{"userId": objectID})
+	if cartCollection != nil {
+		cartCollection.DeleteOne(context.Background(), bson.M{"userId": objectID})
+	}
 
 	return c.Status(201).JSON(order)
 }
@@ -683,6 +733,10 @@ func getOrdersHandler(c *fiber.Ctx) error {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
+
+	if orderCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
 	}
 
 	cursor, err := orderCollection.Find(context.Background(), bson.M{"userId": objectID})
@@ -706,6 +760,10 @@ func getOrderHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid order ID"})
 	}
 
+	if orderCollection == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database not connected"})
+	}
+
 	var order Order
 	err = orderCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&order)
 	if err != nil {
@@ -713,76 +771,4 @@ func getOrderHandler(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(order)
-}
-
-func seedDemoData() {
-	// Create demo products
-	products := []Product{
-		{
-			ID:          primitive.NewObjectID(),
-			Title:       "Wireless Headphones",
-			Description: "High-quality wireless headphones with noise cancellation",
-			Price:       99.99,
-			Category:    "Electronics",
-			Stock:       50,
-			Images:      []string{"https://via.placeholder.com/300x300?text=Headphones"},
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			ID:          primitive.NewObjectID(),
-			Title:       "Smart Watch",
-			Description: "Feature-rich smartwatch with health monitoring",
-			Price:       199.99,
-			Category:    "Electronics",
-			Stock:       30,
-			Images:      []string{"https://via.placeholder.com/300x300?text=Smartwatch"},
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		{
-			ID:          primitive.NewObjectID(),
-			Title:       "Running Shoes",
-			Description: "Comfortable running shoes for all terrains",
-			Price:       79.99,
-			Category:    "Sports",
-			Stock:       100,
-			Images:      []string{"https://via.placeholder.com/300x300?text=Shoes"},
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-	}
-
-	for _, product := range products {
-		productCollection.InsertOne(context.Background(), product)
-	}
-
-	// Create demo users
-	adminPassword, _ := bcrypt.GenerateFromPassword([]byte("Admin@123"), bcrypt.DefaultCost)
-	deliveryPassword, _ := bcrypt.GenerateFromPassword([]byte("Delivery@123"), bcrypt.DefaultCost)
-
-	users := []User{
-		{
-			ID:        primitive.NewObjectID(),
-			Email:     "admin@demo.com",
-			Password:  string(adminPassword),
-			Role:      "admin",
-			IsActive:  true,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		},
-		{
-			ID:        primitive.NewObjectID(),
-			Email:     "delivery@demo.com",
-			Password:  string(deliveryPassword),
-			Role:      "delivery",
-			IsActive:  true,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		},
-	}
-
-	for _, user := range users {
-		userCollection.InsertOne(context.Background(), user)
-	}
 }

@@ -88,7 +88,7 @@ VITE_API_URL=http://localhost:8080/api
 For production, create `.env.production`:
 
 ```
-VITE_API_URL=https://your-backend-url.onrender.com/api
+VITE_API_URL=https://your-backend-url.vercel.app/api
 ```
 
 #### Running the Frontend

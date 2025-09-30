@@ -25,7 +25,7 @@ services:
       - MONGO_URI=mongodb://mongodb:27017
       - MONGO_DB=ecom
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-      - FRONTEND_URL=http://localhost:5174
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5174}
     depends_on:
       - mongodb
     volumes:
@@ -41,7 +41,7 @@ services:
     ports:
       - "5174:5174"
     environment:
-      - VITE_API_URL=http://localhost:8080/api
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8080/api}
     volumes:
       - ./frontend:/app
     working_dir: /app

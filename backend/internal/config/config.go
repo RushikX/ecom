@@ -22,7 +22,7 @@ func Load() *Config {
 		MongoURI:    getEnv("MONGO_URI", ""),
 		Database:    getEnv("MONGO_DB", "ecom"),
 		JWTSecret:   getEnv("JWT_SECRET", ""),
-		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5174"),
+		FrontendURL: getEnv("FRONTEND_URL", ""),
 	}
 }
 

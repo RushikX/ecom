@@ -1,9 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 
-  (window.location.hostname.includes('vercel.app') 
-    ? 'https://ecom-be-git-main-rushikxs-projects.vercel.app/api' 
-    : 'http://localhost:8080/api');
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

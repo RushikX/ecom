@@ -57,8 +57,8 @@ sudo systemctl start mongod
    ```
 
 3. **Access the Application:**
-   - Frontend: http://localhost:5174
-   - Backend API: http://localhost:8080
+   - Frontend: http://localhost:5174 (or check your terminal output)
+   - Backend API: http://localhost:8080 (or check your terminal output)
 
 ## Demo Accounts
 

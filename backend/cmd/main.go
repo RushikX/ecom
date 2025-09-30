@@ -44,11 +44,19 @@ func main() {
 	// Middleware
 	app.Use(recover.New())
 	app.Use(logger.New())
+	// Configure CORS based on environment
+	var allowedOrigins string
+	if cfg.FrontendURL != "" {
+		allowedOrigins = cfg.FrontendURL + ",http://localhost:5173,http://localhost:5174"
+	} else {
+		allowedOrigins = "*"
+	}
+
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
-		AllowCredentials: false,
+		AllowCredentials: cfg.FrontendURL != "",
 	}))
 
 	// Initialize handlers

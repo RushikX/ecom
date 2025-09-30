@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store';
 import { signup, clearError } from '../../store/slices/authSlice';
-import { ShoppingBag, Mail, Lock, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
+import { ShoppingBag, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({

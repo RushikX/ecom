@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"log"
-	"os"
 	"time"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 
 	"ecom-backend/internal/config"
 	"ecom-backend/internal/database"
@@ -20,7 +23,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func main() {
+var app *fiber.App
+
+func init() {
 	// Load configuration
 	cfg := config.Load()
 
@@ -29,10 +34,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to connect to MongoDB:", err)
 	}
-	defer database.Disconnect()
 
 	// Create Fiber app
-	app := fiber.New(fiber.Config{
+	app = fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
@@ -68,7 +72,6 @@ func main() {
 	app.Get("/api/debug", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"message": "Debug endpoint working",
-			"port":    cfg.Port,
 		})
 	})
 
@@ -114,15 +117,17 @@ func main() {
 
 	// Seed demo users
 	seedDemoUsers(cfg.JWTSecret)
+}
 
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	
-	log.Printf("Server starting on port %s", port)
-	log.Fatal(app.Listen(":" + port))
+// Handler is the main entry point for Vercel
+func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	// Convert Lambda request to Fiber request
+	return adaptor.FiberApp(app)(ctx, req)
+}
+
+func main() {
+	// Start the Lambda handler
+	lambda.Start(Handler)
 }
 
 func seedDemoUsers(jwtSecret string) {

@@ -1,6 +1,12 @@
 # E-Commerce Full-Stack Application
 
 A modern, full-stack e-commerce application built with Go (Fiber) backend and React frontend.
+# Demo Video
+
+
+
+https://github.com/user-attachments/assets/156f0fb1-edd8-4b2b-aa92-4354b9e31aa9
+
 
 ## Features
 
@@ -228,3 +234,4 @@ ecom/
 ## License
 
 This project is licensed under the MIT License.
+
